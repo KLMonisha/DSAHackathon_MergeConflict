@@ -1,0 +1,156 @@
+Problem 3: Budget Traveller with Coupons
+Analysis of our solution (traveller.py)
+
+
+How to run it
+
+Option 1, flights typed in or redirected from a file:
+  python traveller.py < sample_input.txt
+  First line N M, second line K C, then M lines u v p.
+
+Option 2, graph from a CSV file (rows of from, to, price, header optional):
+  echo "3 2" | python traveller.py --csv graph.csv
+  The only line on standard input is K C. N is taken as the largest city number in the file.
+
+Option 3, random graph:
+  echo "3 2" | python traveller.py --generate 9 20 --seed 0
+  This builds 9 cities and 20 flights for the given K and C, and saves the graph to generated_graph.csv.
+
+Other options:
+- --compare also runs a Bellman-Ford version and prints both answers and times
+- --no-plot skips the images
+
+Outputs:
+- Output 1 is the first line printed: the minimum cost, or -1. The lines after it list each flight on the route and say where a coupon was used.
+- Output 2 is flights_path.csv. Every flight in the graph is listed. Flights on the chosen route have an x in the "On path" column, flights where a coupon was used also have an x in the "Coupon used" column, and the "Paid" column shows the price actually paid.
+- route.png is the graph with the chosen route highlighted.
+- journey.gif is the animated journey.
+Images are made for graphs with up to 40 cities, beyond that the drawing is unreadable anyway.
+
+
+The idea
+
+The cheapest route is a shortest path problem, but two limits make plain Dijkstra on cities wrong:
+- at most K stops, which means at most K + 1 flights
+- at most C coupons, at most one per flight
+
+The cheapest way to reach a city is not always the best one to continue from. A route that reaches city 5 for 100 using 3 flights might be useless if only 1 flight is left, while a route reaching city 5 for 120 using 1 flight might still get to N. The same goes for coupons. So the search state has to remember how many flights and coupons were used:
+
+  state = (city, flights used, coupons used)
+
+From state (u, f, c) and a flight u to v with price p there are two moves:
+- pay p, go to (v, f + 1, c)
+- if c < C, use a coupon, pay p // 2, go to (v, f + 1, c + 1)
+
+No move is allowed once f = K + 1. We run Dijkstra on this graph of states, starting at (1, 0, 0). The answer is the first time any state at city N comes off the priority queue.
+
+
+Why it is correct
+
+- Prices are never negative and p // 2 is never negative either, so every edge in the state graph has a non-negative weight. Dijkstra is correct on such graphs.
+- Every legal journey (at most K + 1 flights, at most C coupons, at most one per flight) is a path in the state graph, and every path in the state graph is a legal journey. So the cheapest path in the state graph is the cheapest legal journey.
+- Dijkstra takes states off the queue in order of cost. The first state at city N to come off therefore has the minimum cost among all states at N, so we can stop right there. This early stop is one of the main speed-ups over our first version, which kept going until the whole queue was empty.
+- The parent pointer stored for each state records which flight led there and whether a coupon was used, so following them back gives an actual route with that cost. This is what the CSV and the pictures use.
+
+Dominance pruning
+
+When a state (u, f, c) comes off the queue, we skip it if some state (u, f2, c2) already came off with f2 <= f and c2 <= c. That earlier state is at least as cheap (it came off first), used no more flights and no more coupons, so anything the current state can do, the earlier one can do too, for the same or lower cost. Skipping it can never lose the optimum.
+
+To check this quickly we keep minf[u][c2] = fewest flights with which city u was reached using exactly c2 coupons. A state is skipped if f >= minf[u][c2] for any c2 <= c. This cuts the number of states that get expanded by a large amount, especially when K is big.
+
+
+Complexity
+
+Let n be the number of cities, m the number of flights, K the stop limit and C the coupons.
+- There are at most n(K + 2)(C + 1) states and each flight is looked at with 2 choices from each state of its source city.
+- Time is O((K + 2)(C + 1) m log(n K C)) in the worst case.
+- Space is O(n(K + 2)(C + 1)) for distances and parents.
+- In practice pruning means each (city, coupons) pair is expanded only a few times, so it behaves close to O((C + 1) m log n).
+
+
+Comparison with other approaches
+
+Approaches:
+- Plain Dijkstra on cities. Wrong, because it ignores the stop and coupon limits. It gives answers that use too many flights.
+- BFS by number of flights. Wrong when prices differ. It finds the route with fewest flights, not the cheapest.
+- DFS trying every route. Correct but exponential. Only usable for tiny graphs, we use it as the brute-force checker in our tests.
+- Bellman-Ford over layers. Correct. It runs K + 1 rounds and relaxes every flight for every coupon count, so it costs O((K + 1)(C + 1) m) every time, with no early stop. It is simple and was useful for cross-checking, and we kept it in the program behind --compare.
+- Dijkstra on (city, flights, coupons) with early stop and pruning. This is our solution. It is correct and stops as soon as N is reached.
+
+Measured times (ms) on random generated graphs, both always gave the same answer:
+
+  N       M       K     C    Dijkstra    Bellman-Ford
+  100     400     5     2    0.4         1
+  1000    4000    10    2    7.4         24
+  5000    20000   20    3    10.3        473
+  20000   80000   30    3    240         3307
+  20000   80000   200   3    177         26953
+
+Bellman-Ford grows directly with K because it always does K + 1 rounds. Dijkstra hardly changes with K because pruning stops it revisiting cities with worse flight counts. With K = 200 Dijkstra was about 150 times faster.
+
+Compared with our first version of the program:
+- On a graph with 20,000 cities, 60,000 flights, K = 50 and C = 2, the first version took 67 seconds and the new one 0.09 seconds, with the same answer.
+- A CSES-sized input (100,000 cities, 200,000 flights, 1 coupon, no real stop limit) runs in about 2 seconds.
+
+Why this is the best choice here: any correct method has to account for the flight count and the coupon count, so the state space really is (city, flights, coupons). Among exact methods on that state space, Dijkstra with an early stop does the least work, because it never expands states more expensive than the answer, and the dominance rule removes states that cannot help. Bellman-Ford can never do better than its fixed (K + 1) passes over all flights.
+
+
+Corner cases
+
+- N = 1: city 1 is already the destination, the answer is 0 with no flights.
+- No route from 1 to N, or only flights going the wrong way: prints -1. The CSV is still written with no x marks.
+- K = 0: only direct flights 1 to N are allowed.
+- C = 0: the problem becomes LeetCode 787.
+- C larger than K + 1: extra coupons are simply not used, since there is at most one per flight.
+- Odd prices: halving rounds down, so a coupon on 7 gives 3 and a coupon on 1 gives 0.
+- Price 0 flights are allowed.
+- Parallel flights between the same two cities: each is kept separately by its index, the cheapest is used.
+- Self loops: never help because prices are not negative. They are accepted and ignored in the drawing.
+- Cycles: never taken because they only add cost and use up stops.
+- The cheapest route has too many stops: the program picks the cheapest route within K stops instead (for example 1 to 2 to 3 to 4 costs 3, but with K = 1 the answer is the direct flight for 100).
+- A coupon can make a route with fewer stops cheaper than one with more stops, and the search handles that because coupons are part of the state.
+- Large prices up to 10^9: Python integers do not overflow.
+- Bad input: cities outside 1 to N, negative prices, negative K or C, missing flight lines, empty or non-numeric input all stop the program with a clear message.
+
+Option 3 note: our first generator always added the chain 1, 2, 3, ..., N to guarantee a route, but that chain needs N - 2 stops. With N = 12, M = 20 and K = 2, 119 out of 200 generated graphs had no valid route. The new generator first builds a route from 1 to N through a random number of intermediate cities between 0 and K, then adds the other random flights. All 240 graphs we generated in testing (N = 12, M = 20, K from 0 to 3) had a valid route.
+
+
+Testing
+
+Online test cases (all passed):
+- LeetCode 787 example 1, answer 700
+- LeetCode 787 example 2, answer 200
+- LeetCode 787 example 3, answer 500
+- CSES 1195 Flight Discount sample, answer 2
+- Dataford "constrained cheapest path with coupons" example 1, answer 35
+- Dataford example 2, answer -1
+- LeetCode 2093 example 1 (roads entered in both directions), answer 9
+
+Our own tests (all passed):
+- 6000 random small graphs checked against a brute-force search of every route. Both the Dijkstra and the Bellman-Ford answers matched, and for every Dijkstra answer we checked that the route really starts at 1, ends at N, is connected, has at most K + 1 flights and at most C coupons, and costs exactly the answer.
+- 17 hand made corner cases from the list above.
+- Command line tests for all three input options, the CSV marking, -1 output and six kinds of bad input.
+- The large tests mentioned in the comparison section.
+
+In total 40 checks, all passing.
+
+
+Visualization
+
+route.png:
+- Cities are nodes. City 1 (start) is green on the left, city N (destination) is red on the right, the intermediate stops of the chosen route are orange, other cities are light grey.
+- Flights are curved arrows with their price written on them. Flights in both directions between two cities curve to opposite sides so they do not overlap.
+- The chosen route is drawn thick. Normal flights are blue. Flights where a coupon was used are gold and labelled original price -> discounted price.
+
+journey.gif:
+- One frame per flight. The current city has a thick outline.
+- The title shows the flight being taken, the running cost, stops used out of K and coupons used out of C.
+- When a coupon is used, that flight turns gold and the label changes to original -> discounted, for example 182 -> 91.
+
+Sample run (sample_input.txt, 9 cities, 20 flights, K = 3, C = 2):
+  415
+  1 -> 8: 91 (coupon, 182 -> 91)
+  8 -> 6: 174
+  6 -> 9: 150 (coupon, 300 -> 150)
+  Flights: 3, stops: 2, coupons used: 2
+Without coupons the same route would cost 656. The coupons go on the two most expensive flights of the route, which is what you would expect.

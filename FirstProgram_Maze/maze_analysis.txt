@@ -1,0 +1,291 @@
+PROBLEM 1: MAZE WITH KEYS AND DOORS
+Analysis of our solution (Main.java)
+
+==========================================================================
+1. WHAT THE PROGRAM DOES
+==========================================================================
+
+Input is read from standard input. The first line is T (number of key/door
+types), the second line is N, and the next N lines are the grid rows. A row
+can be written either as plain characters (S..#E) or comma separated
+(S,.,.,#,E), so a CSV file can be fed in directly with input redirection:
+
+    java Main < maze.csv
+
+Output 1 is printed to the console: the length of the shortest path from S
+to E, or -1 if E cannot be reached.
+
+Output 2 is written to shortest_path.csv. It is a copy of the grid where
+every open cell ('.') on the shortest path is replaced by 'x'. Keys and
+doors on the path keep their letters, so you can still see which ones the
+path went through.
+
+==========================================================================
+2. APPROACH
+==========================================================================
+
+Every move costs exactly 1 step, so this is a shortest path problem on an
+unweighted graph, and BFS is the natural tool. The catch is that the grid
+cell alone is not enough to describe where we are. Whether a door can be
+crossed depends on which keys we are holding, so two visits to the same cell
+with different keys are really two different situations.
+
+So the state we search over is (row, col, keys), where keys is a bitmask of
+T bits. Bit i is set if key ('a' + i) has been picked up. With T <= 6 there
+are at most 2^6 = 64 different key sets.
+
+Moves from a state (r, c, keys):
+  - try the 4 neighbours (up, down, left, right)
+  - skip it if it is outside the grid or a wall '#'
+  - skip it if it is a door whose key bit is not set in keys
+  - if it is a key, the new mask is keys | (1 << (ch - 'a'))
+  - if the new state was not visited before, mark it, store its parent,
+    and push it on the queue with steps + 1
+
+The search stops the first time a state on the 'E' cell is taken out of the
+queue. The parent arrays pr, pc, pm are then followed back to the start
+state (sr, sc, 0) to mark the path for Output 2.
+
+Why the key set has to be part of the state
+
+This small grid shows it (test 6 below):
+
+    # a # # #
+    # . # # #
+    S . A . E
+    # # # # #
+
+The only way to E goes through door A, and key a is up a dead end. The
+correct path is S, right, up, up (get a), down, down, right (through A),
+right, right to E, which is 8 steps. The cell (2,1) has to be visited twice,
+once without the key and once with it. A BFS that marks cells as visited
+without looking at the keys never comes back to (2,1) after picking up the
+key, and returns -1. We actually ran that cell-only version on this grid and
+it printed -1, while our program prints 8.
+
+==========================================================================
+3. PROOF OF CORRECTNESS
+==========================================================================
+
+Define a graph H whose nodes are the states (r, c, mask) and whose edges are
+exactly the legal single moves described above. Every edge has length 1.
+
+(a) Every path in H from (sr, sc, 0) corresponds to a legal walk in the maze,
+    because an edge into a door only exists when its key bit is already set,
+    and the mask only gains bits when the walk steps on that key. Going the
+    other way, every legal walk in the maze is a path in H, since we can just
+    track the keys collected so far. So the shortest legal walk from S to E
+    has the same length as the shortest path in H from (sr, sc, 0) to any
+    state on the E cell.
+
+(b) BFS removes states from the queue in non-decreasing order of distance.
+    This is the standard BFS property: the queue always holds states of
+    distance d followed by states of distance d + 1, and nothing else.
+    So the first time a state on the E cell is removed, no state on E can
+    be closer, and the steps value we return is the minimum.
+
+(c) Each state is marked visited the moment it is first pushed, and by (b)
+    that first push comes from a shortest route. So the parent stored for it
+    lies on a shortest route as well. Following parents back from the E state
+    therefore gives one actual shortest path, not just its length.
+
+(d) The loop terminates because each of the N x N x 2^T states is pushed at
+    most once. If the queue empties without reaching E, then no state on E is
+    reachable in H, so by (a) no legal walk exists, and -1 is correct.
+
+==========================================================================
+4. TIME AND SPACE COMPLEXITY
+==========================================================================
+
+Let N be the grid side and K = 2^T.
+
+Time:  O(N^2 x K). Each state is pushed and popped once and looks at 4
+       neighbours. Initialising the parent arrays is also O(N^2 x 64).
+
+Space: O(N^2 x K) for the visited array, the three parent arrays and the
+       queue.
+
+Note that the code always allocates 64 masks per cell, even when T is
+smaller, so the memory used is really N^2 x 64 regardless of T. Per state
+that is 1 byte (visited) + 3 x 4 bytes (pr, pc, pm) = 13 bytes. For N = 600
+this is about 360,000 x 64 x 13 bytes, roughly 300 MB, and in our test the
+program ran out of memory at N = 600 with a 256 MB heap. Allocating
+1 << T masks instead of 64 would cut this by 16x when T = 2, for example.
+
+==========================================================================
+5. WHY THIS IS OPTIMAL
+==========================================================================
+
+Any correct algorithm has to at least read the grid, which is already
+Omega(N^2) work. Our running time is O(N^2 x 2^T), and since the problem
+fixes T <= 6, the factor 2^T is at most 64, a constant. So the algorithm is
+O(N^2), which matches that lower bound. Asymptotically you cannot do better.
+
+Within the constant, BFS is also the right choice. All edges have weight 1,
+so BFS already gives exact shortest distances without a priority queue.
+Dijkstra would give the same answer with an extra log factor for nothing.
+
+The 2^T factor is real and cannot be removed in general. A cell can
+legitimately be visited with different key sets (test 6 shows one), and the
+right key set to arrive with is not known in advance. That is why the
+problem bounds T at 6.
+
+==========================================================================
+6. COMPARISON WITH OTHER APPROACHES
+==========================================================================
+
+Approach                    Correct?   Time                 Notes
+--------------------------  ---------  -------------------  -------------------
+BFS on cells only           No         O(N^2)               Fails whenever a
+                                                            cell must be
+                                                            revisited after
+                                                            picking up a key.
+                                                            Gave -1 on test 6
+                                                            instead of 8.
+DFS / backtracking          Yes, if    Exponential          Has to try every
+                            fully run                       path to be sure it
+                                                            found the shortest.
+                                                            Not usable past
+                                                            small grids.
+Dijkstra on (r, c, mask)    Yes        O(N^2 K log(N^2 K))  Same answer as BFS,
+                                                            slower because of
+                                                            the heap. Only
+                                                            needed if moves had
+                                                            different costs.
+A* with Manhattan distance  Yes        Same worst case      Can explore fewer
+                                       as BFS, often        states on open
+                                       faster in practice   grids, but needs a
+                                                            heap, and gives no
+                                                            gain when E is
+                                                            unreachable.
+Bidirectional BFS           Awkward    -                    The backward search
+                                                            does not know which
+                                                            keys the walker
+                                                            holds at E, so the
+                                                            two sides are hard
+                                                            to match up.
+Key graph + bitmask DP      Yes        BFS from each key    Precompute distances
+                                       and S, then DP over  between S, keys and
+                                       2^T subsets          E, then DP over key
+                                                            subsets. Good for
+                                                            the "collect all
+                                                            keys" version, more
+                                                            code and more edge
+                                                            cases for this one.
+BFS on (r, c, mask), ours   Yes        O(N^2 x 2^T)         Simplest correct
+                                                            option, linear in
+                                                            the state space.
+
+Relation to LeetCode 864 (Shortest Path to Get All Keys)
+
+864 uses the same moves and the same (r, c, mask) BFS. The only difference
+is the stopping rule: 864 stops when mask == all keys, while our problem
+stops when the walker reaches E. Our code already computes target (the mask
+of all keys present in the grid) but does not use it. Changing the stop
+condition to
+
+    grid[r][c] == 'E' && keys == target      (all keys, then exit)
+    keys == target                           (LeetCode 864)
+
+turns it into either of those versions without touching anything else.
+
+==========================================================================
+7. CORNER CASES (all run on our compiled program)
+==========================================================================
+
+ #  Case                                    Output  Expected  OK?
+--  --------------------------------------  ------  --------  ----
+ 1  No doors, simple 3x3                    4       4         Yes
+ 2  S right next to E                       1       1         Yes
+ 3  Key exists but is cut off by walls      -1      -1        Yes
+ 4  Key sits behind its own door            -1      -1        Yes
+ 5  E completely walled off                 -1      -1        Yes
+ 6  Must revisit a cell after taking a key  8       8         Yes
+ 7  Keys and doors present but not needed   3       3         Yes
+ 8  Only route to E needs a key detour      12      12        Yes
+ 9  Two S cells in the grid                 2       error     No
+10  Two E cells in the grid                 3       3         Yes (nearest E)
+11  N = 1, grid is just "S"                 -1      -1        Yes
+12  CSV rows with spaces ("S, ., .")        -1      -1        Yes (parsed fine)
+13  15x15 sample with T = 3                 28      28        Yes
+14  T = 5, exit next to S ("S.E")           -1      1         No
+15  No S anywhere in the grid               2       error     No
+16  Door letter beyond T (B with T = 1)     walks   error or  No
+                                            through wall
+17  A row shorter than N                    crash   error     No
+18  Empty cell in a CSV row ("S,")          crash   error     No
+
+Notes on the cases that pass
+
+Case 6 is the important one, it is exactly the situation where a plain cell
+BFS breaks. Case 7 shows the code does not waste steps collecting keys it
+does not need. Case 10 shows that with more than one exit the program
+returns the distance to the nearest one, which is the sensible reading.
+
+Known limitations (cases that fail)
+
+Case 14: 'E' is used both for the exit and for door type 5. When T >= 5 the
+door check (ch >= 'A' && ch < 'A' + T) also matches 'E', so the exit is
+treated as a locked door until key 'e' is found, and a door E placed in the
+grid is treated as an exit once reached. This is a clash in the problem
+statement itself. A fix is to use a different symbol for the exit when
+T >= 5 (we would suggest "EXIT" or '@'), or to read the exit position
+separately.
+
+Case 15: sr and sc start at 0, so if the grid has no S the search silently
+starts from cell (0,0), even if that cell is a wall. The code should check
+that exactly one S was found and stop with an error otherwise.
+
+Case 9: with two S cells the last one scanned is used. Same fix as above.
+
+Case 16: letters outside the first T (for example 'B' when T = 1) are not
+treated as doors or walls, so the walker passes through them as open cells.
+The input should be checked against the allowed characters for the given T.
+
+Cases 17 and 18: rows that are too short, or CSV rows with empty cells,
+throw StringIndexOutOfBounds / ArrayIndexOutOfBounds. The program should
+check row lengths and report which row is wrong.
+
+Output 2 details
+
+  - S and E are not marked with x, which is fine since they are always on
+    the path.
+  - Keys and doors on the path keep their plain letter, so they look the
+    same as keys and doors that were never used (see case 7). Writing them
+    as "xa" / "xA" when they are on the path would make the used ones clear.
+  - When the answer is -1, no CSV file is written at all.
+  - A cell visited twice (case 6 and case 8) is simply marked x once.
+
+==========================================================================
+8. PERFORMANCE MEASUREMENTS
+==========================================================================
+
+Random N x N grids, about 20% walls, T = 4, S in the top left corner and E
+in the bottom right. Times are wall clock, best of 3 runs, and include JVM
+startup (around 60 ms). "Worst" is the same grid with E walled in, so BFS
+has to explore every reachable state before giving up.
+
+   N    Answer   Time    Worst case answer   Worst case time
+----   -------   -----   -----------------   ---------------
+  50       100   72 ms                  -1             73 ms
+ 100       198   97 ms                  -1            102 ms
+ 200       398  168 ms                  -1            192 ms
+ 400       798  508 ms                  -1            628 ms
+ 600      1198  951 ms                  -1           2012 ms
+
+The worst case time grows roughly 4x each time N doubles from 200 upward,
+which fits O(N^2). At small N the JVM startup dominates. Memory, not time,
+is the real limit for big grids, as explained in section 4.
+
+==========================================================================
+9. SUMMARY
+==========================================================================
+
+The solution runs BFS over (cell, keys held) instead of over cells, which
+is what makes it correct when a cell must be revisited after picking up a
+key. It returns the true shortest length, and the parent arrays give the
+actual path for the CSV. The running time is O(N^2 x 2^T), which is O(N^2)
+for T <= 6 and matches the cost of just reading the grid. The main
+weaknesses are in input handling (missing or duplicate S, invalid letters,
+malformed rows) and the E exit / E door clash for T >= 5, all of which are
+easy to fix without changing the algorithm.

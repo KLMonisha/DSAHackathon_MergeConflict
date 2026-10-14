@@ -1,0 +1,16 @@
+N = 18, conflicts = 52, R = 5, lower bound = 4
+DSatur: 5 slots, proven optimal: no, time 0.000098 s
+Branch and bound: 4 slots, proven optimal: yes, time 0.000260 s, nodes 40
+
+DSatur timetable:
+Slot 1: 4, 7, 8, 11, 17
+Slot 2: 2, 14, 15
+Slot 3: 3, 9, 10, 13
+Slot 4: 5, 6, 12, 18
+Slot 5: 1, 16
+
+Branch and bound timetable:
+Slot 1: 1, 6, 11, 13
+Slot 2: 2, 4, 15, 16, 17
+Slot 3: 3, 5, 9, 18
+Slot 4: 7, 8, 10, 12, 14

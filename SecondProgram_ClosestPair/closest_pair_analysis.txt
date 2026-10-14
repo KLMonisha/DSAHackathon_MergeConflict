@@ -1,0 +1,173 @@
+Problem 2: Closest Pair of Points
+Analysis of our solution (closest_pair.py)
+
+
+1. How to run it
+
+The program reads N from standard input and generates N random points.
+
+  echo 60 | python closest_pair.py
+  echo 60 | python closest_pair.py --float --seed 7
+  echo 60 | python closest_pair.py --bench --animate --show
+
+Options:
+- --float generates floating point coordinates (2 decimals) instead of integers
+- --range R sets the coordinate range to [-R, R], default 1000
+- --seed S makes the random points repeatable
+- --bench runs the performance analysis and the agreement check
+- --animate saves the recursion animation as dnc_animation.gif (N up to 300)
+- --show opens the plots in a window as well as saving them
+- --no-plot prints the three output lines only
+
+If the input contains N followed by N pairs of coordinates, those points are used instead of random ones. We added this so we could feed in test cases from SPOJ and Kattis directly.
+
+Output is three lines:
+
+  Brute-Force: 3.605551 (-9, -12) (-6, -10)
+  Divide-and-Conquer: 3.605551 (-9, -12) (-6, -10)
+  Time: Brute-Force 0.310 ms, Divide-and-Conquer 0.245 ms
+
+The plots are saved as closest_pair_plane.png (all points, both pairs, the dividing line and the 2d strip) and runtime_vs_n.png (running time vs N, linear and log-log).
+
+
+2. Brute force method
+
+We check every pair (i, j) with i < j and keep the one with the smallest squared distance. That is n(n-1)/2 pairs, so the time is O(n^2) and the extra space is O(1).
+
+It is obviously correct because it looks at every possible pair. That is also why we use it as the reference answer when testing the divide and conquer version.
+
+
+3. Divide and conquer method
+
+Steps:
+- Sort the points once by x (ties broken by y) and once by y (ties broken by x).
+- If a sub-problem has 3 or fewer points, check all pairs directly.
+- Otherwise split the x-sorted list in half by position. The x value of the middle point is the dividing line.
+- Split the y-sorted list into left and right halves in O(n) by marking which points went left. This keeps both halves sorted by y without sorting again.
+- Solve both halves. Let d be the smaller of the two answers.
+- Build the strip: all points with |x - midx| < d, taken from the y-sorted list so the strip is already sorted by y.
+- For each point in the strip, compare it only with the points after it while their y difference is less than d. Update the answer if a closer pair is found.
+
+Two details matter for correctness:
+- We split by position in the sorted list, not by x value. If many points share the middle x value, splitting by value could put all of them on one side and the recursion would never shrink. Splitting by position always halves the list.
+- All comparisons use squared distances (dx*dx + dy*dy), and the strip and break conditions are written as dx*dx < best and dy*dy >= best. There is no square root inside the algorithm, so integer inputs are compared exactly. The square root is only taken once at the end for printing.
+
+
+4. Proof that divide and conquer is correct
+
+Take any closest pair (p, q). There are three cases.
+
+- Both points are on the left side. The left recursive call finds a pair at that distance.
+- Both points are on the right side. Same argument with the right call.
+- One point is on each side. Let d be the best distance from the two halves, so dist(p, q) < d or else we already have an answer as good. Then |p.x - midx| <= |p.x - q.x| < d and the same for q, so both points are in the strip. Also |p.y - q.y| < d, so when we scan the strip in y order, the inner loop has not hit the break condition yet when it reaches the other point. So the pair is checked.
+
+In all three cases the minimum is found, which proves correctness by induction on the size of the sub-problem (the base case of 3 or fewer points is plain brute force).
+
+Why the inner loop is short: for a point p in the strip, any point it is compared with lies in a d by 2d rectangle above p. Split that rectangle into eight d/2 by d/2 squares, four on each side of the line. Two points in the same square would be at distance at most d/sqrt(2) < d, which is impossible since they are on the same side and d is the best distance on each side. So each square has at most one point and p is compared with at most 7 others. The strip step is O(n) per level.
+
+With duplicate points this bound is fine too. If two points coincide then d becomes 0, the strip condition |x - midx| < 0 is never true, and the strip is empty.
+
+
+5. Complexity
+
+Brute force: O(n^2) time, O(1) extra space.
+
+Divide and conquer: the two sorts are O(n log n). Each level of the recursion does O(n) work (splitting the y list, building the strip, scanning the strip with at most 7 comparisons per point). There are log n levels, so T(n) = 2T(n/2) + O(n) = O(n log n). Space is O(n) for the sorted lists plus O(log n) for the recursion stack, so Python's recursion limit is never a problem (depth is about 17 for 100,000 points).
+
+
+6. Why O(n log n) is optimal
+
+In the algebraic decision tree model, finding the closest pair needs Omega(n log n) time. The reason is that element uniqueness (are all n numbers distinct?) is known to need Omega(n log n), and it reduces to closest pair: put each number on the x axis and check whether the closest distance is 0. So no comparison based algorithm can do better in the worst case, and our divide and conquer version matches that bound.
+
+The only way to beat it is to leave that model. A randomized grid hashing method (Rabin's algorithm) runs in O(n) expected time, but it uses floor and hashing and its worst case is not guaranteed, so for this assignment the deterministic O(n log n) method is the right choice.
+
+
+7. Corner cases and how they are handled
+
+- N = 0 or N = 1: there is no pair. Both lines print "no pair exists (N < 2)" and the times are close to 0.
+- N = 2: the divide and conquer goes straight to the base case and returns that one pair.
+- N = 3: handled entirely by the base case.
+- Negative N: the program prints "N cannot be negative" and stops.
+- Duplicate points: the distance is 0.000000 and the duplicate pair is printed. Both algorithms agree.
+- All points identical: same as above, every pair is at distance 0.
+- Collinear points: no special handling is needed. Nothing in the method assumes points are in general position.
+- All points share the same x: the split is by position, so the halves still shrink. Every point is in the strip, but the y break condition keeps the work linear per level. 100,000 points on one vertical line took 0.55 s.
+- All points share the same y: the x split works normally and the strip at each level is small.
+- Ties (several pairs at the same minimum distance): the distance is always the same, but the two algorithms may print different pairs. Both are correct answers. This is why we compare distances, not pairs, when checking agreement.
+- Closest pair crossing the dividing line: this is exactly what the strip step is for, and we have a test where the only closest pair straddles the line.
+- Large integer coordinates (up to 10^9): Python integers do not overflow and squared distances are exact.
+- Floating point coordinates: handled the same way. The output is rounded to 6 decimal places.
+- Mixed integer and float input such as "1 2.5": each value is parsed as an int if possible, otherwise as a float.
+- Fewer coordinates than N in the input: the program falls back to generating N random points.
+
+
+8. Testing
+
+Test cases from online judges:
+- SPOJ CLOPPAIR sample 1 (5 points): expected "0 1 1.000000", we got the same pair and distance.
+- SPOJ CLOPPAIR sample 2 (5 points): expected "0 4 1.414214", we got the same.
+- Kattis closestpair2, all three samples: two points, three points, and a case with a duplicated point. Distances matched in all three, including 0 for the duplicate.
+
+Our own test cases (all passed):
+- N = 0, N = 1, N = 2, N = 2 with both points the same, negative N
+- all points identical, one duplicate pair, collinear on a diagonal, all on one vertical line, all on one horizontal line
+- negative coordinates, coordinates of 10^6 and 10^9, floats, mixed int and float input
+- a square of 4 points with a four way tie
+- a set where the only closest pair crosses the dividing line
+- 20,000 random small sets (N from 0 to 40) with lots of ties: small ranges like 0 to 2, shared x, shared y, points on y = 3x - 2, floats, and only 4 possible x values. Divide and conquer matched brute force on every one.
+- 200 random sets with N from 200 to 1500, all matched.
+- The --bench option runs another 2000 random sets of this kind every time, all 2000 matched.
+
+Large inputs (divide and conquer only, brute force would take far too long):
+- 100,000 random integer points: 0.89 s
+- 100,000 points with the same x: 0.55 s
+- 100,000 points with the same y: 0.31 s
+- 90,000 points on a 300 by 300 lattice: 0.35 s
+- 100,000 floats with 2 decimals, like the Kattis inputs: 0.95 s
+
+
+9. Performance results
+
+Measured with --bench on random integer points, one run per size, times in ms:
+
+  N        Brute-Force    Divide-and-Conquer    Agree
+  100      0.677          0.278                 yes
+  200      2.499          0.597                 yes
+  400      10.073         1.269                 yes
+  800      34.431         2.747                 yes
+  1600     148.173        6.018                 yes
+  3200     763.951        13.348                yes
+  6400     3513.058       47.157                yes
+
+What the numbers show:
+- Every time N doubles, brute force takes about 4 to 5 times longer, which is what O(n^2) predicts.
+- Divide and conquer takes a bit more than 2 times longer per doubling, which fits O(n log n).
+- On the log-log plot the brute force line has slope close to 2 and the divide and conquer line slope close to 1.
+- At N = 6400 divide and conquer is about 75 times faster. At N = 100,000 brute force would need roughly 5 x 10^9 distance computations, which is not practical in Python, while divide and conquer finishes in under a second.
+- For very small N (under about 50) brute force can be as fast or faster, because divide and conquer pays for sorting and function calls. In the run above brute force was already the slower one at N = 100.
+
+Timings depend on the machine and change a little from run to run, so the exact numbers will differ, but the growth pattern stays the same.
+
+
+10. Comparison of approaches
+
+- Brute force: O(n^2) time, O(1) space, very simple, fine for small N, too slow past a few thousand points in Python.
+- Divide and conquer (ours): O(n log n) time, O(n) space, deterministic and optimal in the comparison model.
+- Divide and conquer that re-sorts the strip at every level: O(n log^2 n). This is a common mistake, we avoid it by splitting the y-sorted list instead of sorting again.
+- Sweep line with a balanced tree: also O(n log n), similar speed, but needs a sorted set which Python does not have built in.
+- Randomized grid hashing: O(n) expected, faster on average but no worst case guarantee.
+- KD-tree nearest neighbour queries: about O(n log n) on random data, but worse on bad inputs and more code.
+
+
+11. Visualization
+
+- closest_pair_plane.png: all points in dark grey. The brute force pair is joined by an orange solid line with circles, the divide and conquer pair by a blue dashed line with squares, so both are visible even when they are the same pair. The top level dividing line is a purple dashed line and the strip of width 2d is shaded yellow. The legend shows both distances, the value of d and how many points were in the strip.
+- runtime_vs_n.png: running time against N for both methods, on a normal scale and on a log-log scale.
+- dnc_animation.gif: one frame per step of the recursion. Split frames show the current sub-problem and its dividing line. Base case frames show the pair found directly. Merge frames show the strip, the points inside it, the comparisons that were made and the best pair so far.
+
+Note that d in the plane plot is the value used to build the top level strip, which is the best distance from the two halves. If the closest pair crosses the line, the final answer is smaller than this d.
+
+
+12. Summary
+
+Both methods always return the same minimum distance. We checked this on more than 22,000 test cases, including every corner case listed in the question and the SPOJ and Kattis samples. Brute force is O(n^2) and is used as the reference. Divide and conquer is O(n log n), which is the best possible for comparison based algorithms, and in practice it is many times faster from a few hundred points upward.

@@ -1,0 +1,359 @@
+<title>Keys and Doors Maze</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;800&family=Chivo+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: control strip on top; board left, run panel right; stacks to one column on phones */
+:root{
+  --bg:#f3f4f7; --panel:#ffffff; --fg:#1c2030; --muted:#5d6377; --line:#d9dce5; --accent:#3346c9; --accent-fg:#ffffff; --err:#c0392b;
+  --display:"Chivo",system-ui,sans-serif; --body:"Chivo",system-ui,sans-serif; --mono:"Chivo Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14161d; --panel:#1d2029; --fg:#e8eaf2; --muted:#9aa0b4; --line:#323645; --accent:#8c9bff; --accent-fg:#10121a; --err:#ff8a7a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14161d; --panel:#1d2029; --fg:#e8eaf2; --muted:#9aa0b4; --line:#323645; --accent:#8c9bff; --accent-fg:#10121a; --err:#ff8a7a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 40px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+h1{font-family:var(--display);font-weight:800;font-size:1.7rem;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:2px 0 0;max-width:68ch}
+.controls{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:end;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+select,input[type=number]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
+input[type=number]{width:5.5rem}
+button,.filebtn{font:inherit;font-weight:600;padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:focus-visible,.filebtn:focus-within,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.filebtn{position:relative;display:inline-block}
+.filebtn input{position:absolute;opacity:0;width:1px;height:1px}
+.msg{font-size:.85rem;color:var(--err);min-height:1.2em;width:100%}
+.main{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:800px){.main{grid-template-columns:minmax(0,1fr)}}
+.boardbox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;justify-content:center}
+#board{display:block;width:100%;max-width:620px;height:auto}
+#board text{font-family:var(--mono);font-weight:600;font-size:.5px;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.keytok{transition:opacity .35s,transform .35s;transform-box:fill-box;transform-origin:center}
+.keytok.taken{opacity:0;transform:scale(.1)}
+.doorClosed,.doorOpen{transition:opacity .35s}
+.door.opened .doorClosed{opacity:0}
+.door:not(.opened) .doorOpen{opacity:0}
+.side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+.card h2{font-family:var(--display);font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px;font-weight:600}
+.big{font-family:var(--mono);font-size:2.4rem;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.big small{font-size:.9rem;color:var(--muted);font-weight:400;margin-left:6px}
+.goalnote{font-size:.82rem;color:var(--muted);margin:8px 0 0}
+.stats{display:flex;gap:18px;margin-top:10px;font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums;flex-wrap:wrap}
+.stats b{color:var(--fg);font-family:var(--mono)}
+.inv{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.slot{aspect-ratio:1/1;border-radius:8px;border:2px dashed var(--line);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:600;color:var(--muted);transition:background-color .3s,transform .3s}
+.slot.have{border-style:solid;border-color:var(--c);background:var(--c);color:#fff}
+.slot.pop{animation:pop .45s}
+@keyframes pop{50%{transform:scale(1.18)}}
+.playbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.playbar input[type=range]{flex:1;min-width:120px;accent-color:var(--accent)}
+.legend{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 12px;font-size:.85rem}
+.legend span{display:flex;align-items:center;gap:8px}
+.sw{width:16px;height:16px;border-radius:3px;border:1px solid #888;flex:none}
+.sw.round{border-radius:50%}
+.log{font-family:var(--mono);font-size:.8rem;color:var(--muted);max-height:9.5em;overflow:auto;margin:0;padding-left:1.2em}
+.log li.now{color:var(--fg);font-weight:600}
+textarea{width:100%;box-sizing:border-box;min-height:9em;font-family:var(--mono);font-size:.75rem;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);resize:vertical;white-space:pre;overflow:auto}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap}
+.hint{font-size:.78rem;color:var(--muted);margin:6px 0 0}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Keys and Doors Maze</h1>
+    <p class="sub">Shortest walk by BFS over (row, column, keys held). Pick a goal, generate a maze or load your own grid, then play the walk to watch keys get picked up and doors open.</p>
+  </header>
+
+  <section class="controls" aria-label="Input">
+    <div class="field"><label for="goalSel">Goal</label>
+      <select id="goalSel">
+        <option value="keys-exit" selected>All keys, then exit</option>
+        <option value="keys">All keys only (LeetCode 864)</option>
+        <option value="exit">Exit only</option>
+      </select></div>
+    <div class="field"><label for="tSel">T (key types)</label>
+      <select id="tSel"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select></div>
+    <div class="field"><label for="nIn">N (grid size)</label><input id="nIn" type="number" min="5" max="41" value="15"></div>
+    <div class="field"><label for="seedIn">Seed</label><input id="seedIn" type="number" value="7"></div>
+    <button id="genBtn" class="primary">Generate maze</button>
+    <span class="filebtn">Load CSV<input id="fileIn" type="file" accept=".csv,.txt,text/csv"></span>
+    <button id="pasteToggle">Paste grid</button>
+    <div id="pasteBox" hidden style="width:100%">
+      <textarea id="pasteIn" spellcheck="false" placeholder='CSV rows, e.g.&#10;#,#,#&#10;S,.,E&#10;&#10;or a LeetCode grid, e.g.&#10;["@.a..","###.#","b.A.B"]'></textarea>
+      <button id="pasteGo" style="margin-top:6px">Solve pasted grid</button>
+    </div>
+    <div class="msg" id="msg" role="status"></div>
+  </section>
+
+  <section class="main">
+    <div class="boardbox">
+      <svg id="board" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Maze board with shortest path"></svg>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>Output 1 · shortest path</h2>
+        <div class="big" id="lenOut">–</div>
+        <p class="goalnote" id="goalNote"></p>
+        <div class="stats"><span>Step <b id="stepOut">0</b></span><span>Keys <b id="keysOut">0</b></span><span>Doors opened <b id="doorsOut">0</b></span></div>
+      </div>
+
+      <div class="card">
+        <h2>Key inventory</h2>
+        <div class="inv" id="inv"></div>
+      </div>
+
+      <div class="card">
+        <h2>Walk</h2>
+        <div class="playbar">
+          <button id="playBtn" class="primary">Play</button>
+          <button id="stepBtn">Step</button>
+          <button id="resetBtn">Reset</button>
+          <label for="speed" style="font-size:.8rem;color:var(--muted)">Speed</label>
+          <input id="speed" type="range" min="1" max="10" value="5">
+        </div>
+        <ol class="log" id="log"></ol>
+      </div>
+
+      <div class="card">
+        <h2>Legend</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2 style="margin:0">Output 2 · path CSV</h2><button id="copyBtn">Copy CSV</button></div>
+    <textarea id="csvOut" readonly spellcheck="false"></textarea>
+    <p class="hint">Path cells are <b>x</b>. A key picked up on the path is written <b>xa</b>, a door opened on it <b>xA</b>. Keys and doors off the path keep their plain letter. For T ≥ 5 the exit is written <b>EXIT</b>, since <b>E</b> is also door type 5.</p>
+  </section>
+</div>
+
+<script>
+const COLORS = ["#2f6fde","#f08a24","#8b4fd6","#0f9e9e","#e0479a","#b8920a"]; // a/A … f/F
+const OPEN="#ffffff", WALL="#111111", START="#22a447", EXITC="#d63031", GRIDLINE="#c3c7d1";
+const SAMPLE = [["#","#","#","#","#","#","#","#","#","#","#","#","#","#","#"],["#",".","#",".","E","B",".",".",".",".","C",".",".",".","#"],["#",".","#",".","#","#","#","#","#",".","#","#","#","b","#"],["#","a","#",".",".",".",".",".","#",".",".",".","#",".","#"],["#",".",".","#",".","#","#","#","#",".","#",".","#",".","#"],["#",".",".",".",".",".",".",".","#",".","#","c","#",".","#"],["#","#","#","#","#","#","#",".","#","#","#",".","#","#","#"],["#",".",".",".",".",".","#",".",".",".","#",".",".",".","#"],["#","#",".",".","#",".","#","#","#",".","#","#",".",".","#"],["#",".",".",".","#",".",".",".",".",".","#",".",".",".","#"],["#",".","#",".","#",".","#","#",".","#","#",".",".","#","#"],["#",".","#",".",".",".","A",".","#",".",".",".","S",".","#"],["#",".","#","#","#","#","#",".",".","#","#","#","#",".","#"],["#",".",".",".",".",".",".",".",".",".",".",".",".",".","#"],["#","#","#","#","#","#","#","#","#","#","#","#","#","#","#"]];
+const GOAL_NOTE={ "keys-exit":"Picks up every key, then walks to the exit.", "keys":"Stops as soon as every key is held, as in LeetCode 864.", "exit":"Shortest route to the exit; keys only when a door is in the way." };
+
+const $ = id => document.getElementById(id);
+const isStart = ch => ch==="S" || ch==="@";
+const isExit = (ch,T) => ch==="EXIT" || (ch==="E" && T<5);
+const isKey  = ch => ch.length===1 && ch>="a" && ch<="f";
+const isDoor = (ch,T) => ch.length===1 && ch>="A" && ch<="F" && !isExit(ch,T);
+
+// ---------- solver: BFS over (r, c, mask) ----------
+function solve(g,T,goal){
+  const R=g.length, C=g[0].length, full=(1<<T)-1; let s=null;
+  for(let r=0;r<R;r++)for(let c=0;c<C;c++)if(isStart(g[r][c]))s=[r,c];
+  const id=(r,c,m)=>(r*C+c)*64+m;
+  const done=(ch,m)=>goal==="keys"?m===full:goal==="exit"?isExit(ch,T):(isExit(ch,T)&&m===full);
+  const parent=new Map([[id(s[0],s[1],0),-1]]);
+  const q=[[s[0],s[1],0]]; let head=0;
+  while(head<q.length){
+    const [r,c,m]=q[head++];
+    if(done(g[r][c],m)){
+      const path=[]; let k=id(r,c,m);
+      while(k!==-1){const cell=Math.floor(k/64); path.push([Math.floor(cell/C),cell%C]); k=parent.get(k);}
+      path.reverse(); return {len:path.length-1,path};
+    }
+    for(const [dr,dc] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      const nr=r+dr,nc=c+dc; if(nr<0||nc<0||nr>=R||nc>=C)continue;
+      const ch=g[nr][nc]; if(ch==="#")continue;                       // walls are never entered
+      if(isDoor(ch,T) && !((m>>(ch.charCodeAt(0)-65))&1))continue;   // locked door
+      const nm=isKey(ch)?m|(1<<(ch.charCodeAt(0)-97)):m;
+      const k=id(nr,nc,nm); if(!parent.has(k)){parent.set(k,id(r,c,m)); q.push([nr,nc,nm]);}
+    }
+  }
+  return {len:-1,path:[]};
+}
+
+// ---------- generator ----------
+function rng(seed){let a=seed>>>0;return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function shuffle(a,R){for(let i=a.length-1;i>0;i--){const j=Math.floor(R()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function carve(n,R){
+  const g=Array.from({length:n},()=>Array(n).fill("#")); const st=[[1,1]]; g[1][1]=".";
+  const D=[[-1,0],[1,0],[0,-1],[0,1]];
+  while(st.length){
+    const [r,c]=st[st.length-1];
+    const nb=D.filter(([dr,dc])=>r+2*dr>0&&r+2*dr<n-1&&c+2*dc>0&&c+2*dc<n-1&&g[r+2*dr][c+2*dc]==="#");
+    if(!nb.length){st.pop();continue;}
+    const [dr,dc]=nb[Math.floor(R()*nb.length)]; g[r+dr][c+dc]="."; g[r+2*dr][c+2*dc]="."; st.push([r+2*dr,c+2*dc]);
+  }
+  const inner=[]; for(let r=1;r<n-1;r++)for(let c=1;c<n-1;c++)if(g[r][c]==="#")inner.push([r,c]);
+  shuffle(inner,R); inner.slice(0,Math.floor(inner.length/8)).forEach(([r,c])=>g[r][c]=".");
+  return g;
+}
+function generate(n,T,seed,goal){
+  const R=rng(seed); let best=null,bestScore=-1;
+  for(let t=0;t<3000;t++){
+    const g=carve(n,R); const cells=[];
+    for(let r=0;r<n;r++)for(let c=0;c<n;c++)if(g[r][c]===".")cells.push([r,c]);
+    if(cells.length<2*T+2)continue; shuffle(cells,R);
+    const [s,e]=cells; if(Math.abs(s[0]-e[0])+Math.abs(s[1]-e[1])<n)continue;
+    g[s[0]][s[1]]="S"; g[e[0]][e[1]]=T>=5?"EXIT":"E";
+    for(let i=0;i<T;i++){const [kr,kc]=cells[2+i],[dr,dc]=cells[2+T+i]; g[kr][kc]=String.fromCharCode(97+i); g[dr][dc]=String.fromCharCode(65+i);}
+    const res=solve(g,T,goal); if(res.len<0)continue;
+    const doors=res.path.filter(([r,c])=>isDoor(g[r][c],T)).length, score=doors*1000+res.len;
+    if(score>bestScore){best=g;bestScore=score;}
+    if(doors>=Math.min(T,3))break;
+  }
+  return best;
+}
+
+// ---------- input parsing ----------
+function parseGrid(text){
+  text=text.trim(); if(!text)throw new Error("The grid is empty.");
+  let rows;
+  if(text.startsWith("[")){                                   // LeetCode style ["@.a..","###.#"]
+    const m=[...text.matchAll(/"([^"]*)"/g)].map(x=>x[1]);
+    if(!m.length)throw new Error("Couldn't find any quoted rows in that list.");
+    rows=m.map(s=>[...s]);
+  } else {
+    rows=text.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.includes(",")?l.split(",").map(s=>s.trim()):[...l.trim()]);
+  }
+  rows.forEach((r,i)=>{if(r.length!==rows[0].length)throw new Error(`Row ${i+1} has ${r.length} cells but row 1 has ${rows[0].length}.`);});
+  return rows;
+}
+function detectT(g){
+  let t=0; g.flat().forEach(ch=>{if(isKey(ch))t=Math.max(t,ch.charCodeAt(0)-96);});
+  return Math.max(1,t);
+}
+function validate(g,T,goal){
+  const ok=new Set([".","#","S","@","EXIT",..."abcdef".slice(0,T),..."ABCDEF".slice(0,T)]); if(T<5)ok.add("E");
+  let s=0,e=0;
+  g.forEach((row,r)=>row.forEach((ch,c)=>{
+    if(!ok.has(ch))throw new Error(`Cell "${ch}" at row ${r+1}, column ${c+1} isn't allowed with T = ${T}.`);
+    if(isStart(ch))s++; if(isExit(ch,T))e++;
+  }));
+  if(s!==1)throw new Error(`The grid needs exactly one start (S or @); found ${s}.`);
+  if(goal!=="keys"&&e!==1)throw new Error(`This goal needs exactly one exit; found ${e}. Use "All keys only" for LeetCode 864 grids.`);
+}
+function markedCSV(g,path,T){
+  const out=g.map(r=>r.slice());
+  path.forEach(([r,c])=>{const ch=g[r][c]; if(ch===".")out[r][c]="x"; else if(isKey(ch)||isDoor(ch,T))out[r][c]="x"+ch;});
+  return out.map(r=>r.join(",")).join("\n");
+}
+
+// ---------- rendering (one SVG, 1 unit = 1 cell, so the path can't drift off the grid) ----------
+const NS="http://www.w3.org/2000/svg";
+let G=null,T=3,GOAL="keys-exit",res=null,step=0,timer=null,EV=[],keyEls={},doorEls={};
+function el(tag,attrs,parent){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+function txt(x,y,s,fill,parent){const t=el("text",{x,y,fill},parent);t.textContent=s;return t;}
+
+function load(grid,t,goal){
+  stop(); G=grid; T=t; GOAL=goal; res=solve(G,T,GOAL); step=0;
+  const R=G.length,C=G[0].length, svg=$("board"); svg.innerHTML=""; keyEls={}; doorEls={};
+  svg.setAttribute("viewBox",`-0.1 -0.1 ${C+0.2} ${R+0.2}`);
+  const base=el("g",{},svg), tint=el("g",{},svg), lines=el("g",{},svg), toks=el("g",{},svg);
+  G.forEach((row,r)=>row.forEach((ch,c)=>{
+    let fill=OPEN; if(ch==="#")fill=WALL; else if(isStart(ch))fill=START; else if(isExit(ch,T))fill=EXITC;
+    el("rect",{x:c,y:r,width:1,height:1,fill,stroke:GRIDLINE,"stroke-width":0.03},base);
+    if(isStart(ch))txt(c+.5,r+.5,ch,"#fff",toks);
+    else if(isExit(ch,T))txt(c+.5,r+.5,"E","#fff",toks);
+    else if(isKey(ch)){
+      const col=COLORS[ch.charCodeAt(0)-97], g=el("g",{class:"keytok"},toks);
+      el("circle",{cx:c+.5,cy:r+.5,r:.34,fill:col},g); txt(c+.5,r+.52,ch,"#fff",g); keyEls[r+","+c]=g;
+    } else if(isDoor(ch,T)){
+      const col=COLORS[ch.charCodeAt(0)-65], g=el("g",{class:"door"},toks);
+      const closed=el("g",{class:"doorClosed"},g);
+      el("rect",{x:c+.04,y:r+.04,width:.92,height:.92,rx:.06,fill:col},closed); txt(c+.5,r+.52,ch,"#fff",closed);
+      const open=el("g",{class:"doorOpen"},g);
+      el("rect",{x:c+.08,y:r+.08,width:.84,height:.84,rx:.06,fill:"#fff",stroke:col,"stroke-width":.08},open);
+      // unlocked padlock: body + open shackle
+      el("rect",{x:c+.3,y:r+.48,width:.4,height:.3,rx:.05,fill:col},open);
+      el("path",{d:`M${c+.38} ${r+.48} V${r+.36} a.12 .12 0 0 1 .24 -.02`,fill:"none",stroke:col,"stroke-width":.07,"stroke-linecap":"round"},open);
+      doorEls[r+","+c]=g;
+    }
+  }));
+  el("rect",{x:0,y:0,width:C,height:R,fill:"none",stroke:WALL,"stroke-width":.08},base);
+  const seen=new Set();
+  res.path.forEach(([r,c])=>{const k=r+","+c; if(G[r][c]==="."&&!seen.has(k)){seen.add(k); el("rect",{x:c,y:r,width:1,height:1,fill:"#3346c9","fill-opacity":.13},tint);}});
+  const pts=a=>a.map(([r,c])=>`${c+.5},${r+.5}`).join(" ");
+  if(res.path.length){
+    el("polyline",{points:pts(res.path),fill:"none",stroke:"#1c2030","stroke-opacity":.35,"stroke-width":.1,"stroke-dasharray":".22 .18","stroke-linecap":"round","stroke-linejoin":"round"},lines);
+    el("polyline",{id:"walked",points:"",fill:"none",stroke:"#3346c9","stroke-opacity":.85,"stroke-width":.2,"stroke-linecap":"round","stroke-linejoin":"round"},lines);
+    el("circle",{id:"walker",r:.28,fill:"#ffd400",stroke:"#1c2030","stroke-width":.07},svg);
+  }
+  $("lenOut").innerHTML=res.len<0?`-1<small>not possible</small>`:`${res.len}<small>steps</small>`;
+  $("goalNote").textContent=GOAL_NOTE[GOAL];
+  $("csvOut").value=res.len<0?G.map(r=>r.join(",")).join("\n"):markedCSV(G,res.path,T);
+  buildInv(); buildLegend(); buildLog(); render();
+}
+function buildInv(){
+  $("inv").innerHTML="";
+  for(let i=0;i<T;i++){const s=document.createElement("div"); s.className="slot"; s.id="slot"+i; s.style.setProperty("--c",COLORS[i]); s.textContent=String.fromCharCode(97+i); $("inv").appendChild(s);}
+}
+function buildLegend(){
+  let h=`<span><i class="sw" style="background:${OPEN}"></i>Open</span><span><i class="sw" style="background:${WALL}"></i>Wall</span><span><i class="sw" style="background:${START}"></i>Start</span><span><i class="sw" style="background:${EXITC}"></i>Exit</span>`;
+  for(let i=0;i<T;i++)h+=`<span><i class="sw round" style="background:${COLORS[i]}"></i>Key ${String.fromCharCode(97+i)} / door ${String.fromCharCode(65+i)}</span>`;
+  $("legend").innerHTML=h;
+}
+function buildLog(){
+  EV=[]; $("log").innerHTML="";
+  if(res.len<0){$("log").innerHTML=`<li>No walk meets this goal.</li>`;return;}
+  let held=0; const last=res.path.length-1;
+  res.path.forEach(([r,c],i)=>{const ch=G[r][c]; let e=null;
+    if(i===0)e=`Start at (${r},${c})`;
+    else if(isKey(ch)){const b=1<<(ch.charCodeAt(0)-97); if(!(held&b))e=`Step ${i}: pick up key ${ch} at (${r},${c})`; held|=b;}
+    else if(isDoor(ch,T))e=`Step ${i}: go through door ${ch} at (${r},${c})`;
+    else if(isExit(ch,T)&&i===last)e=`Step ${i}: reach exit at (${r},${c})`;
+    else if(isExit(ch,T))e=`Step ${i}: pass over the exit, keys still missing`;
+    if(i===last&&GOAL==="keys"&&!e)e=`Step ${i}: all keys held`;
+    EV.push(e);
+    if(e){const li=document.createElement("li");li.textContent=e;li.dataset.i=i;$("log").appendChild(li);}
+  });
+}
+function render(pop){
+  if(!G)return;
+  const P=res.path, upto=P.slice(0,step+1), held=new Set(), visited=new Set();
+  upto.forEach(([r,c])=>{visited.add(r+","+c); const ch=G[r][c]; if(isKey(ch))held.add(ch);});
+  for(const k in keyEls)keyEls[k].classList.toggle("taken",visited.has(k));
+  let opened=0; for(const k in doorEls){const o=visited.has(k); doorEls[k].classList.toggle("opened",o); if(o)opened++;}
+  for(let i=0;i<T;i++){const s=$("slot"+i),h=held.has(String.fromCharCode(97+i));
+    if(h&&!s.classList.contains("have")&&pop){s.classList.remove("pop");void s.offsetWidth;s.classList.add("pop");}
+    s.classList.toggle("have",h);}
+  if(P.length){
+    $("walked").setAttribute("points",upto.map(([r,c])=>`${c+.5},${r+.5}`).join(" "));
+    const [r,c]=P[step]; $("walker").setAttribute("cx",c+.5); $("walker").setAttribute("cy",r+.5);
+  }
+  $("stepOut").textContent=step; $("keysOut").textContent=held.size; $("doorsOut").textContent=opened;
+  let cur=null; document.querySelectorAll("#log li").forEach(li=>{const on=+li.dataset.i<=step; li.classList.remove("now"); if(on)cur=li;});
+  if(cur){cur.classList.add("now"); const box=$("log"); if(cur.offsetTop<box.scrollTop||cur.offsetTop>box.scrollTop+box.clientHeight-20)box.scrollTop=cur.offsetTop-box.clientHeight/2;}
+  $("playBtn").textContent=timer?"Pause":(P.length&&step>=P.length-1?"Replay":"Play");
+}
+function stop(){if(timer){clearInterval(timer);timer=null;}}
+function tick(){if(step<res.path.length-1){step++;render(true);}else{stop();render();}}
+function play(){
+  if(timer){stop();render();return;}
+  if(!res.path.length)return;
+  if(step>=res.path.length-1)step=0;
+  timer=setInterval(tick,1100-$("speed").value*100); render();
+}
+
+// ---------- wiring ----------
+const msg=t=>$("msg").textContent=t||"";
+function loadText(text){
+  try{const g=parseGrid(text), t=detectT(g), goal=$("goalSel").value; $("tSel").value=String(t); validate(g,t,goal); msg(); load(g,t,goal);}
+  catch(err){msg(err.message);}
+}
+$("genBtn").onclick=()=>{msg(); const n=Math.max(5,Math.min(41,+$("nIn").value||15)), t=+$("tSel").value, goal=$("goalSel").value;
+  const g=generate(n,t,+$("seedIn").value||0,goal); if(!g){msg("Couldn't build a solvable maze at this size. Try a larger N.");return;} load(g,t,goal);};
+$("fileIn").onchange=e=>{const f=e.target.files[0]; if(!f)return; const fr=new FileReader(); fr.onload=()=>loadText(fr.result); fr.readAsText(f); e.target.value="";};
+$("pasteToggle").onclick=()=>{$("pasteBox").hidden=!$("pasteBox").hidden;};
+$("pasteGo").onclick=()=>loadText($("pasteIn").value);
+$("goalSel").onchange=()=>{if(!G)return; try{validate(G,T,$("goalSel").value);msg();load(G,T,$("goalSel").value);}catch(err){msg(err.message);$("goalSel").value=GOAL;}};
+$("playBtn").onclick=play;
+$("stepBtn").onclick=()=>{stop(); if(step<res.path.length-1){step++;render(true);}else render();};
+$("resetBtn").onclick=()=>{stop();step=0;render();};
+$("speed").oninput=()=>{if(timer){stop();play();}};
+$("copyBtn").onclick=async()=>{try{await navigator.clipboard.writeText($("csvOut").value);$("copyBtn").textContent="Copied";}catch(e){$("csvOut").select();$("copyBtn").textContent="Selected, press Ctrl+C";}setTimeout(()=>$("copyBtn").textContent="Copy CSV",1800);};
+
+load(SAMPLE,3,"keys-exit");
+step=res.path.length-1; render();   // open on the finished walk; Play replays it
+</script>

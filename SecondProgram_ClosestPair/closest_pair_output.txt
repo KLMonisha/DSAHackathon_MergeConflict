@@ -1,0 +1,87 @@
+--- Random integers, N = 60, range 0-100, seed 42 ---
+Input N = 60
+Brute-Force: 2.236068 (61, 90) (63, 89)
+Divide-and-Conquer: 2.236068 (63, 89) (61, 90)
+Time: Brute-Force 0.011 ms, Divide-and-Conquer 0.256 ms
+Check: both algorithms agree on the minimum distance
+
+--- Random floats, N = 1000, range 0-1000, seed 7 ---
+Input N = 1000
+Brute-Force: 0.613346 (174.915, 917.091) (174.827, 916.484)
+Divide-and-Conquer: 0.613346 (174.827, 916.484) (174.915, 917.091)
+Time: Brute-Force 2.678 ms, Divide-and-Conquer 4.709 ms
+Check: both algorithms agree on the minimum distance
+
+--- Random floats, N = 10000, range 0-1000000, seed 11 ---
+Input N = 10000
+Brute-Force: 119.663574 (180867.564, 83915.145) (180812.781, 84021.532)
+Divide-and-Conquer: 119.663574 (180867.564, 83915.145) (180812.781, 84021.532)
+Time: Brute-Force 137.944 ms, Divide-and-Conquer 12.793 ms
+Check: both algorithms agree on the minimum distance
+
+--- Duplicate points, N = 60 ---
+Input N = 60
+Brute-Force: 0.000000 (60, 45) (60, 45)
+Divide-and-Conquer: 0.000000 (3, 5) (3, 5)
+Time: Brute-Force 0.004 ms, Divide-and-Conquer 0.019 ms
+Check: both algorithms agree on the minimum distance
+
+--- Collinear floats on one line, N = 60 ---
+Input N = 60
+Brute-Force: 0.214888 (51.209, 230.725) (51.393, 230.836)
+Divide-and-Conquer: 0.214888 (51.209, 230.725) (51.393, 230.836)
+Time: Brute-Force 0.004 ms, Divide-and-Conquer 0.028 ms
+Check: both algorithms agree on the minimum distance
+
+--- Floats all sharing one x, N = 60 ---
+Input N = 60
+Brute-Force: 0.184000 (500, 51.209) (500, 51.393)
+Divide-and-Conquer: 0.184000 (500, 51.209) (500, 51.393)
+Time: Brute-Force 0.007 ms, Divide-and-Conquer 0.032 ms
+Check: both algorithms agree on the minimum distance
+
+--- Floats all sharing one y, N = 60 ---
+Input N = 60
+Brute-Force: 0.184000 (51.209, 500) (51.393, 500)
+Divide-and-Conquer: 0.184000 (51.209, 500) (51.393, 500)
+Time: Brute-Force 0.004 ms, Divide-and-Conquer 0.022 ms
+Check: both algorithms agree on the minimum distance
+
+--- Lattice with many equal distances, N = 49 ---
+Input N = 49
+Brute-Force: 16.000000 (0, 0) (16, 0)
+Divide-and-Conquer: 16.000000 (0, 0) (0, 16)
+Time: Brute-Force 0.003 ms, Divide-and-Conquer 0.010 ms
+Check: both algorithms agree on the minimum distance
+
+--- N = 2 ---
+Input N = 2
+Brute-Force: 34.058773 (60, 45) (86, 67)
+Divide-and-Conquer: 34.058773 (60, 45) (86, 67)
+Time: Brute-Force 0.000 ms, Divide-and-Conquer 0.001 ms
+Check: both algorithms agree on the minimum distance
+
+--- N = 1 ---
+Input N = 1
+Brute-Force: no pair exists (N = 1, at least 2 points are needed)
+Divide-and-Conquer: no pair exists (N = 1, at least 2 points are needed)
+Time: Brute-Force 0.000 ms, Divide-and-Conquer 0.000 ms
+
+--- N = 0 ---
+Input N = 0
+Brute-Force: no pair exists (N = 0, at least 2 points are needed)
+Divide-and-Conquer: no pair exists (N = 0, at least 2 points are needed)
+Time: Brute-Force 0.000 ms, Divide-and-Conquer 0.000 ms
+
+--- Running time vs N (random floats, median of runs) ---
+N        Brute-Force (ms)   Divide-and-Conquer (ms)   Speed-up   Agree
+100                 0.012                     0.039       0.3x   yes
+250                 0.060                     0.138       0.4x   yes
+500                 0.358                     0.433       0.8x   yes
+1000                0.837                     0.772       1.1x   yes
+2000                3.351                     1.630       2.1x   yes
+4000               13.220                     3.683       3.6x   yes
+8000               53.181                     8.917       6.0x   yes
+16000             601.846                    26.338      22.9x   yes
+
+Agreement check: 700 of 700 test cases (random, duplicate, collinear, shared x, shared y, lattice, clustered; N from 2 to 199) gave the same minimum distance.
